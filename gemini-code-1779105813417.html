@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schicht- und Schulplan (MAS-25)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .header {
+            background-color: #0056b3;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+        
+        /* Buttons im Header */
+        .action-btn {
+            margin-top: 10px;
+            padding: 12px;
+            width: 100%;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+        }
+        #toggle-legend-btn {
+            background-color: #ffffff;
+            color: #0056b3;
+        }
+        #jump-btn {
+            background-color: #ffc107;
+            color: #000;
+        }
+        .action-btn:active { opacity: 0.9; transform: scale(0.98); }
+
+        /* Ein- und ausklappbare Infobox */
+        .legend-container {
+            display: none;
+            background: white;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 8px;
+            font-size: 0.95em;
+            text-align: left;
+            line-height: 1.6;
+            color: #000;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+            flex-shrink: 0;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+
+        /* Suchfeld Styling */
+        .search-container {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .search-container input {
+            width: 100%;
+            padding: 12px;
+            font-size: 1em;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            margin-bottom: 8px;
+        }
+        #search-btn {
+            background-color: #28a745;
+            color: white;
+            margin-top: 0;
+        }
+
+        /* Kalender Grid Design */
+        #calendar-container {
+            margin-top: 20px;
+            padding-bottom: 50px;
+        }
+        .month-block {
+            background-color: white;
+            margin-bottom: 25px;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .month-title {
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #0056b3;
+            border-bottom: 2px solid #f4f4f9;
+            padding-bottom: 5px;
+        }
+        .grid-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin-bottom: 5px;
+        }
+        .weekday {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.8em;
+            color: #666;
+        }
+        .grid-body {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+        .day-tile {
+            border-radius: 4px;
+            padding: 4px;
+            min-height: 65px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border: 1px solid rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: transform 0.1s;
+            position: relative;
+        }
+        .day-tile:active {
+            transform: scale(0.95);
+        }
+        .empty-tile {
+            background-color: #f9f9f9;
+            border: none;
+            cursor: default;
+        }
+        .day-number {
+            font-weight: bold;
+            font-size: 1.1em;
+            text-align: right;
+            margin-bottom: 2px;
+        }
+        .day-desc {
+            font-size: 0.75em;
+            text-align: center;
+            line-height: 1.1;
+            word-wrap: break-word;
+            font-weight: bold;
+        }
+
+        /* Farbcodierung */
+        .school { background-color: #d4edda; color: #155724; border-bottom: 3px solid #28a745; }
+        .work { background-color: #cce5ff; color: #004085; border-bottom: 3px solid #007bff; }
+        .work-holiday { background-color: #fff3cd; color: #856404; border-bottom: 3px solid #ffc107; }
+        .free { background-color: #f8d7da; color: #721c24; border-bottom: 3px solid #dc3545; }
+
+        /* Hervorhebung Heute */
+        .today {
+            border: 3px solid #ff0000;
+        }
+        
+        /* Deutliche Such-Hervorhebung für den gewählten Bereich */
+        .highlight-search {
+            outline: 4px solid #0056b3 !important;
+            outline-offset: -2px;
+            box-shadow: 0 0 15px rgba(0, 86, 179, 0.8) !important;
+            z-index: 10;
+            transition: all 0.3s ease-in-out;
+            transform: scale(1.02);
+        }
+
+        /* Großes Detail-Fenster (Modal) */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .modal-content h2 {
+            margin-top: 0;
+            font-size: 1.4em;
+            color: #0056b3;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .modal-info-box {
+            margin: 20px 0;
+            font-size: 1.2em;
+            line-height: 1.5;
+        }
+        .modal-badge {
+            display: inline-block;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .modal-close-btn {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 14px;
+            width: 100%;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .modal-close-btn:active { background-color: #000; }
+
+        @media (max-width: 400px) {
+            .day-tile { min-height: 55px; padding: 2px; }
+            .day-desc { font-size: 0.65em; }
+            .day-number { font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Kalender (MAS-25)</h1>
+        
+        <button id="toggle-legend-btn" class="action-btn" onclick="toggleLegend()">ℹ️ Infos & Navigation einblenden</button>
+        
+        <div id="legend-box" class="legend-container">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #d4edda; border-bottom: 3px solid #28a745;"></div>
+                <span><strong>Schule:</strong> 08:00 - 15:00 Uhr</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #cce5ff; border-bottom: 3px solid #007bff;"></div>
+                <span><strong>Arbeit:</strong> Mo-Do 07:30 - 16:15 | Fr 07:30 - 13:00</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #fff3cd; border-bottom: 3px solid #ffc107;"></div>
+                <span><strong>Ferien-Arbeit:</strong> Normale Arbeitszeiten</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f8d7da; border-bottom: 3px solid #dc3545;"></div>
+                <span><strong>Frei:</strong> Wochenende & Gesetzliche Feiertage</span>
+            </div>
+            
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Suchen (z.B. 15.08.2026 oder KW 34)">
+                <button id="search-btn" class="action-btn" onclick="searchCalendar()">🔍 Datum oder Woche suchen</button>
+            </div>
+
+            <button id="jump-btn" class="action-btn" onclick="jumpToToday()">📅 Zum heutigen Tag springen</button>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="modal-overlay" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2 id="modal-date">Datum</h2>
+            <div class="modal-info-box">
+                <div id="modal-status-badge" class="modal-badge">Status</div>
+                <div id="modal-time-details">Uhrzeit</div>
+                <div id="modal-extra-info" style="margin-top: 10px; font-weight: bold; color: #cc0000;"></div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()">Schließen</button>
+        </div>
+    </div>
+
+    <div id="calendar-container"></div>
+
+    <script>
+        const schoolBlocks = [
+            { start: '2026-09-07', end: '2026-09-11' }, { start: '2026-10-05', end: '2026-10-09' },
+            { start: '2026-11-16', end: '2026-11-20' }, { start: '2026-12-14', end: '2026-12-18' },
+            { start: '2026-12-21', end: '2026-12-22' }, { start: '2027-01-25', end: '2027-01-29' },
+            { start: '2027-02-22', end: '2027-02-26' }, { start: '2027-03-15', end: '2027-03-19' },
+            { start: '2027-04-12', end: '2027-04-16' }, { start: '2027-05-10', end: '2027-05-14' },
+            { start: '2027-05-31', end: '2027-06-04' }, { start: '2027-06-28', end: '2027-07-02' }
+        ];
+
+        const publicHolidays = {
+            '2026-10-03': 'Tag der Deutschen Einheit', '2026-10-31': 'Reformationstag', 
+            '2026-12-25': '1. Weihnachtsfeiertag', '2026-12-26': '2. Weihnachtsfeiertag', 
+            '2027-01-01': 'Neujahr', '2027-03-26': 'Karfreitag',
+            '2027-03-29': 'Ostermontag', '2027-05-01': 'Tag der Arbeit', 
+            '2027-05-06': 'Christi Himmelfahrt', '2027-05-17': 'Pfingstmontag'
+        };
+
+        const schoolHolidays = [
+            { start: '2026-10-12', end: '2026-10-23', name: 'Herbstferien' }, 
+            { start: '2026-12-23', end: '2027-01-08', name: 'Weihnachtsferien' },
+            { start: '2027-02-01', end: '2027-02-02', name: 'Zeugnisferien' }, 
+            { start: '2027-03-22', end: '2027-04-02', name: 'Osterferien' },
+            { start: '2027-05-07', end: '2027-05-07', name: 'Ferientag (Himmelfahrt)' }, 
+            { start: '2027-05-18', end: '2027-05-18', name: 'Ferientag (Pfingsten)' },
+            { start: '2027-07-08', end: '2027-08-18', name: 'Sommerferien' }
+        ];
+
+        function getIsoString(dateObj) {
+            let y = dateObj.getFullYear();
+            let m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            let d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function getWeekNumber(d) {
+            let date = new Date(d.getTime());
+            date.setHours(0, 0, 0, 0);
+            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+            let week1 = new Date(date.getFullYear(), 0, 4);
+            let kw = 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+            return { week: kw, year: date.getFullYear() };
+        }
+
+        const today = new Date();
+        const todayIso = getIsoString(today);
+        let idForToday = null;
+
+        const container = document.getElementById('calendar-container');
+        const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+        function toggleLegend() {
+            const box = document.getElementById('legend-box');
+            const btn = document.getElementById('toggle-legend-btn');
+            if (box.style.display === 'block') {
+                box.style.display = 'none';
+                btn.innerText = 'ℹ️ Infos & Navigation einblenden';
+            } else {
+                box.style.display = 'block';
+                btn.innerText = '🔼 Infos ausblenden';
+            }
+        }
+
+        function forceCloseLegend() {
+            document.getElementById('legend-box').style.display = 'none';
+            document.getElementById('toggle-legend-btn').innerText = 'ℹ️ Infos & Navigation einblenden';
+        }
+
+        function openDetails(dateText, typeLabel, timeText, extraInfo, cssClass) {
+            document.getElementById('modal-date').innerText = dateText;
+            const badge = document.getElementById('modal-status-badge');
+            badge.innerText = typeLabel;
+            badge.className = `modal-badge ${cssClass}`;
+            document.getElementById('modal-time-details').innerHTML = `Zeit: <strong>${timeText}</strong>`;
+            
+            const extraEl = document.getElementById('modal-extra-info');
+            if(extraInfo) {
+                extraEl.style.display = 'block';
+                extraEl.innerText = extraInfo;
+            } else {
+                extraEl.style.display = 'none';
+            }
+            document.getElementById('detail-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').style.display = 'none';
+        }
+
+        // Generiere Kalender
+        for (let year = 2026; year <= 2027; year++) {
+            let startMonth = (year === 2026) ? 7 : 0; 
+            let endMonth = (year === 2027) ? 7 : 11;
+
+            for (let month = startMonth; month <= endMonth; month++) {
+                const monthBlock = document.createElement('div');
+                monthBlock.className = 'month-block';
+                
+                const title = document.createElement('div');
+                title.className = 'month-title';
+                title.innerText = `${monthNames[month]} ${year}`;
+                monthBlock.appendChild(title);
+
+                const gridHeader = document.createElement('div');
+                gridHeader.className = 'grid-header';
+                ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].forEach(day => {
+                    const el = document.createElement('div');
+                    el.className = 'weekday';
+                    el.innerText = day;
+                    gridHeader.appendChild(el);
+                });
+                monthBlock.appendChild(gridHeader);
+
+                const gridBody = document.createElement('div');
+                gridBody.className = 'grid-body';
+
+                let firstDayDate = new Date(year, month, 1);
+                let daysInMonth = new Date(year, month + 1, 0).getDate();
+                let firstDayIndex = firstDayDate.getDay();
+                firstDayIndex = (firstDayIndex === 0) ? 6 : firstDayIndex - 1;
+
+                for (let i = 0; i < firstDayIndex; i++) {
+                    const empty = document.createElement('div');
+                    empty.className = 'day-tile empty-tile';
+                    gridBody.appendChild(empty);
+                }
+
+                for (let day = 1; day <= daysInMonth; day++) {
+                    let currentDate = new Date(year, month, day);
+                    let dateKey = getIsoString(currentDate);
+                    let dayOfWeek = currentDate.getDay(); 
+                    
+                    let kwData = getWeekNumber(currentDate);
+
+                    let cssClass = '';
+                    let tileText = '';
+                    let fullStatusText = '';
+                    let timeText = '';
+                    let extraInfo = '';
+                    let pubHolidayName = publicHolidays[dateKey];
+
+                    if (dayOfWeek === 0 || dayOfWeek === 6 || pubHolidayName) {
+                        cssClass = 'free';
+                        tileText = 'Frei';
+                        timeText = 'Frei';
+                        fullStatusText = pubHolidayName ? 'Gesetzlicher Feiertag' : 'Wochenende';
+                        if (pubHolidayName) extraInfo = pubHolidayName;
+                    } else {
+                        let isSchool = false;
+                        for (let s of schoolBlocks) {
+                            if (dateKey >= s.start && dateKey <= s.end) {
+                                isSchool = true; break;
+                            }
+                        }
+
+                        if (isSchool) {
+                            cssClass = 'school';
+                            tileText = 'Schule';
+                            fullStatusText = 'Berufsschule';
+                            timeText = '08:00 - 15:00 Uhr';
+                        } else {
+                            let schoolHolidayName = '';
+                            for (let h of schoolHolidays) {
+                                if (dateKey >= h.start && dateKey <= h.end) {
+                                    schoolHolidayName = h.name; break;
+                                }
+                            }
+                            timeText = (dayOfWeek === 5) ? '07:30 - 13:00 Uhr' : '07:30 - 16:15 Uhr';
+
+                            if (schoolHolidayName) {
+                                cssClass = 'work-holiday';
+                                tileText = 'Arbeit<br>(Ferien)';
+                                fullStatusText = 'Arbeit im Betrieb';
+                                extraInfo = `Hinweis: Es sind ${schoolHolidayName}`;
+                            } else {
+                                cssClass = 'work';
+                                tileText = 'Arbeit';
+                                fullStatusText = 'Arbeit';
+                            }
+                        }
+                    }
+
+                    const dayTile = document.createElement('div');
+                    dayTile.className = `day-tile ${cssClass}`;
+                    dayTile.id = 'day-' + dateKey;
+                    
+                    dayTile.setAttribute('data-kw', kwData.week);
+                    dayTile.setAttribute('data-kw-year', kwData.year);
+
+                    if (dateKey === todayIso) {
+                        dayTile.classList.add('today');
+                        idForToday = 'day-' + dateKey;
+                    }
+
+                    dayTile.innerHTML = `
+                        <div class="day-number">${day}</div>
+                        <div class="day-desc">${tileText}</div>
+                    `;
+
+                    const formattedDateString = currentDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                    dayTile.onclick = function() {
+                        openDetails(formattedDateString, fullStatusText, timeText, extraInfo, cssClass);
+                    };
+
+                    gridBody.appendChild(dayTile);
+                }
+
+                monthBlock.appendChild(gridBody);
+                container.appendChild(monthBlock);
+            }
+        }
+
+        function clearHighlights() {
+            document.querySelectorAll('.highlight-search').forEach(el => {
+                el.classList.remove('highlight-search');
+            });
+        }
+
+        function searchCalendar() {
+            const input = document.getElementById('search-input').value.trim().toLowerCase();
+            clearHighlights(); 
+            
+            let elementsToHighlight = [];
+
+            const dateMatch = input.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+            
+            if (dateMatch) {
+                let d = dateMatch[1].padStart(2, '0');
+                let m = dateMatch[2].padStart(2, '0');
+                let y = dateMatch[3];
+                if (y.length === 2) y = "20" + y;
+                
+                let target = document.getElementById(`day-${y}-${m}-${d}`);
+                if (target) elementsToHighlight.push(target);
+            } 
+            else {
+                const kwMatch = input.match(/^(?:kw)?\s*(\d{1,2})(?:\s+(\d{4}))?$/);
+                
+                if (kwMatch) {
+                    let kw = kwMatch[1];
+                    let year = kwMatch[2]; 
+                    
+                    let selector = `[data-kw="${kw}"]`;
+                    if (year) {
+                        selector += `[data-kw-year="${year}"]`;
+                    }
+                    
+                    let targets = document.querySelectorAll(selector);
+                    targets.forEach(t => elementsToHighlight.push(t));
+                }
+            }
+
+            if (elementsToHighlight.length > 0) {
+                // Scrollt das erste gefundene Element exakt in die Bildschirmmitte
+                const firstElement = elementsToHighlight[0];
+                firstElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                elementsToHighlight.forEach(el => {
+                    el.classList.add('highlight-search');
+                    setTimeout(() => {
+                        el.classList.remove('highlight-search');
+                    }, 3500);
+                });
+
+                // Infobox einklappen
+                forceCloseLegend();
+                
+            } else {
+                alert("Datum oder Kalenderwoche nicht gefunden! \nBitte prüfe die Eingabe (z.B. '15.08.2026' oder 'KW 34').");
+            }
+        }
+
+        function jumpToToday() {
+            clearHighlights();
+            if (idForToday) {
+                let todayEl = document.getElementById(idForToday);
+                // Scrollt den heutigen Tag exakt in die Bildschirmmitte
+                todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                todayEl.classList.add('highlight-search');
+                setTimeout(() => todayEl.classList.remove('highlight-search'), 3500);
+                
+                // Infobox einklappen
+                forceCloseLegend();
+                
+            } else {
+                alert("Der heutige Tag liegt außerhalb des Kalender-Zeitraums.");
+            }
+        }
+        
+        document.getElementById("search-input").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                searchCalendar();
+            }
+        });
+    </script>
+</body>
+</html>

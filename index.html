@@ -177,12 +177,11 @@
         .work-holiday { background-color: #fff3cd; color: #856404; border-bottom: 3px solid #ffc107; }
         .free { background-color: #f8d7da; color: #721c24; border-bottom: 3px solid #dc3545; }
 
-        /* Hervorhebung Heute */
         .today {
             border: 3px solid #ff0000;
         }
         
-        /* Deutliche Such-Hervorhebung für den gewählten Bereich */
+        /* Deutliche Such-Hervorhebung */
         .highlight-search {
             outline: 4px solid #0056b3 !important;
             outline-offset: -2px;
@@ -255,7 +254,7 @@
 </head>
 <body>
 
-    <div class="header">
+    <div class="header" id="sticky-header">
         <h1>Kalender (MAS-25)</h1>
         
         <button id="toggle-legend-btn" class="action-btn" onclick="toggleLegend()">ℹ️ Infos & Navigation einblenden</button>
@@ -519,6 +518,34 @@
             });
         }
 
+        // Neue Funktion zum exakten Zentrieren (berechnet alles manuell)
+        function scrollToElementCentered(element) {
+            // 1. Box sofort einklappen, damit sich die Seitenhöhe anpasst
+            forceCloseLegend();
+
+            // 2. Einen winzigen Moment (50 Millisekunden) warten, damit der Browser die neue Höhe übernommen hat
+            setTimeout(() => {
+                const header = document.getElementById('sticky-header');
+                const headerHeight = header.offsetHeight;
+                
+                // Position des gesuchten Elements berechnen
+                const elementRect = element.getBoundingClientRect();
+                const absoluteElementTop = elementRect.top + window.scrollY;
+                
+                // Wir berechnen die Mitte der SICHTBAREN Fläche (Bildschirmhöhe minus Kopfzeile)
+                const visibleWindowHeight = window.innerHeight - headerHeight;
+                
+                // Ziel-Y-Koordinate = Element-Position - Kopfzeile - halber Bildschirm + halbe Kachelhöhe
+                const targetY = absoluteElementTop - headerHeight - (visibleWindowHeight / 2) + (elementRect.height / 2);
+
+                // Und ab geht die Fahrt
+                window.scrollTo({
+                    top: targetY,
+                    behavior: 'smooth'
+                });
+            }, 50);
+        }
+
         function searchCalendar() {
             const input = document.getElementById('search-input').value.trim().toLowerCase();
             clearHighlights(); 
@@ -554,9 +581,8 @@
             }
 
             if (elementsToHighlight.length > 0) {
-                // Scrollt das erste gefundene Element exakt in die Bildschirmmitte
-                const firstElement = elementsToHighlight[0];
-                firstElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Den neuen Scroll-Befehl nutzen
+                scrollToElementCentered(elementsToHighlight[0]);
 
                 elementsToHighlight.forEach(el => {
                     el.classList.add('highlight-search');
@@ -564,9 +590,6 @@
                         el.classList.remove('highlight-search');
                     }, 3500);
                 });
-
-                // Infobox einklappen
-                forceCloseLegend();
                 
             } else {
                 alert("Datum oder Kalenderwoche nicht gefunden! \nBitte prüfe die Eingabe (z.B. '15.08.2026' oder 'KW 34').");
@@ -577,14 +600,12 @@
             clearHighlights();
             if (idForToday) {
                 let todayEl = document.getElementById(idForToday);
-                // Scrollt den heutigen Tag exakt in die Bildschirmmitte
-                todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Den neuen Scroll-Befehl nutzen
+                scrollToElementCentered(todayEl);
                 
                 todayEl.classList.add('highlight-search');
                 setTimeout(() => todayEl.classList.remove('highlight-search'), 3500);
-                
-                // Infobox einklappen
-                forceCloseLegend();
                 
             } else {
                 alert("Der heutige Tag liegt außerhalb des Kalender-Zeitraums.");
